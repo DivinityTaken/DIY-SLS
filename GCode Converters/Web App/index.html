@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>GCode to SLS</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bs-custom-file-input/dist/bs-custom-file-input.js"></script>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.1/css/bootstrap.min.css">
+
+    <script>
+        $(document).ready(function () {
+                // Initialize the input box
+                bsCustomFileInput.init("#fileInput");
+
+                // Create new file reader
+                const fileReader = new FileReader();
+                // On read text
+                fileReader.onload = function () {
+                    // Enable step 2
+                    $("#powerNumber").prop("disabled", false);
+                    $("#powerRange").prop("disabled", false);
+                }
+
+                // Wait for file to be selected
+                $("#fileInput").change(function () {
+                    // Ensure 1 file was selected
+                    if ($(this).prop('files').length !== 1) {
+                        $("#powerNumber").prop("disabled", true);
+                        $("#powerRange").prop("disabled", true);
+
+                        $("#downloadButton").prop("disabled", true);
+                    };
+
+                    // Read file
+                    fileReader.readAsText($(this).prop('files')[0]);
+                });
+
+                // Listen for range change
+                $("#powerNumber").change(function () {
+                    updatePower($(this).val())
+                });
+
+                // Listen for slider change
+                $("#powerRange").change(function () {
+                    updatePower($(this).val())
+                });
+
+                function updatePower(power) {
+                    // Check if value is within range
+                    if (power > 255 | power < 0) power = 128;
+
+                    // Update UI
+                    $("#powerNumber").val(power)
+                    $("#powerRange").val(power)
+
+                    // Enable step 3
+                    $("#downloadButton").prop("disabled", false);
+                }
+
+                // Listen for download button click
+                $("#downloadButton").click(function () {
+                    // Get file data
+                    let gCodeData = fileReader.result;
+
+                    gCodeData = gCodeData.split("E-").join("\nM107 P0;");
+
+                    gCodeData = gCodeData.split("E").join(`\nM42 P9 S${$("#powerNumber").val()};`);
+
+                    gCodeData = gCodeData.split("QQQQ").join(`\nG28 Y0\nG91\nM280 P0 S70\nG0 Y170 E1200 F3600\nM400\nM280 P0 S0\nG90`);
+
+                    // Generate blob from text
+                    const downloadBlob = window.URL.createObjectURL(new Blob([gCodeData], { type: 'text/gcode' }));;
+
+                    // Create file download element
+                    $("body").append(`<a id="file" href="${downloadBlob}" download="SLS_${$("#fileInput").prop('files')[0].name}"></a>`)
+
+                    // Click to download
+                    $("#file")[0].click();
+
+                    // Clean up file
+                    $("#file").remove();
+                });
+            })
+    </script>
+</head>
+
+<body>
+
+    <main role="main" class="flex-shrink-0">
+        <div class="container w-50">
+            <h1 class="mt-4 text-center">GCode to SLS</h1>
+            <h5 class="text-center">A simple web converter to take normal FDM GCode files and make them SLS compatible.
+            </h5>
+            <div class="jumbotron p-4">
+                <h6>Step 1</h6>
+                <p>Select a GCode file from your computer</p>
+                <div class="input-group mb-3">
+
+                    <div class="custom-file">
+                        <input type="file" class="custom-file-input" id="fileInput">
+                        <label class="custom-file-label" for="fileInput">Choose file</label>
+                    </div>
+                </div>
+
+                <hr />
+
+                <h6>Step 2</h6>
+                <p>Set the laser power</p>
+                <div class="form-group">
+                    <input disabled type="number" class="form-control" id="powerNumber" placeholder="128" min="0" max="255">
+                    <input disabled type="range" class="form-control-range mt-1" id="powerRange" min="0" max="255">
+                </div>
+
+                <hr />
+
+                <h6>Step 3</h6>
+                <p>Download the newly generated file</p>
+                <button disabled type="button" class="btn btn-primary" id="downloadButton">Download</button>
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>
